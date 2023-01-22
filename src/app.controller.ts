@@ -1,13 +1,14 @@
-import { Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
 export class AppController {
 	constructor(private readonly appService: AppService) {}
 
-	@Get()
-	getHello(): string {
-		return this.appService.getHello();
+	@Post('/')
+	async heliusWebook(@Body() body: any) {
+	  console.log('helius body:', body)
+	  await this.appService.processTransaction(body[0].signature);
 	}
 
 	@Post('/findTables')
