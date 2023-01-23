@@ -5,15 +5,20 @@ import { AppService } from './app.service';
 export class AppController {
 	constructor(private readonly appService: AppService) {}
 
-	@Post('/')
-	async heliusWebook(@Body() body: any) {
+	@Post('/index')
+	async index(@Body() body: any) {
 	  console.log('helius body:', body)
 	  await this.appService.processTransaction(body[0].signature);
 	}
 
 	@Post('/findTables')
 	@HttpCode(200)
-	async findTables(accounts: string[]): Promise<string[]> {
+	async findTables(@Body() accounts: string[]): Promise<string[]> {
 		return this.appService.findTables(accounts);
+	}
+
+	@Get('/stat')
+	async stat() {
+		// return this.appService.getStat();
 	}
 }
