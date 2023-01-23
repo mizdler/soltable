@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpException, HttpStatus, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
@@ -13,8 +13,11 @@ export class AppController {
 
 	@Post('/findTables')
 	@HttpCode(200)
-	async findTables(@Body() accounts: string[]): Promise<string[]> {
-		return this.appService.findTables(accounts);
+	async findTables(@Body() accounts: string[]): Promise<{ matchedTables: string[], matchedAccounts: string[] }> {
+		if (accounts.length > 256) {
+			throw new HttpException('accounts too large', HttpStatus.NOT_ACCEPTABLE);
+		}
+		return this.appService.findTables(new Set(accounts));
 	}
 
 	@Get('/stat')

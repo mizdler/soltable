@@ -121,7 +121,7 @@ export class AppService implements OnApplicationBootstrap {
 		}
 	}
 
-	async findTables(accounts: string[]): Promise<string[]> {
+	async findTables(accounts: Set<string>): Promise<{ matchedTables: string[], matchedAccounts: string[] }> {
 		let heatTable : {[addr: string]: {count: number, included: boolean}} = {};
 		let candidateTables: Array<string> = [];
 		for (let acc of accounts) {
@@ -139,7 +139,21 @@ export class AppService implements OnApplicationBootstrap {
 			}
 		}
 
-		return candidateTables.sort((a, b) => heatTable[a].count > heatTable[b].count ? -1 : 1);
+		const sortedTables = candidateTables.sort((a, b) => heatTable[a].count > heatTable[b].count ? -1 : 1);
+
+		let matchedAccounts = [];
+		const matchedTables = [];
+		for (let table of sortedTables) {
+			const trs = this.tableRecords.filter(tr => tr.table === table && accounts.has(tr.account));
+			for (let tr of trs) {
+				if (!matchedAccounts.find(ma => ma === tr.account)) {
+					matchedAccounts = matchedAccounts.concat(trs.map(t => t.account));
+					matchedTables.push(table);
+					break;
+				}
+			}
+		}
+		return { matchedTables, matchedAccounts };
 	}
 
 	async processRawIns(ins: PartiallyDecodedInstruction) {
