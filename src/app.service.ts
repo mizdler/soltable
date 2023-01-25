@@ -2,6 +2,7 @@ import { Injectable, OnApplicationBootstrap } from '@nestjs/common'
 import { AddressLookupTableProgram, Connection, PartiallyDecodedInstruction, PublicKey } from '@solana/web3.js'
 import axios from 'axios';
 import { base58_to_binary } from 'base58-js'
+import { stringify } from 'querystring';
 import { PrismaService } from './prisma.service'
 
 @Injectable()
@@ -17,15 +18,14 @@ export class AppService implements OnApplicationBootstrap {
 
 	async onApplicationBootstrap() {
 		this.tableRecords = await this.prisma.tableRecord.findMany();
-		// await this.processOld();
+		await this.processOld();
 	}
 
 	async processOld() {
 		const lastCompletedPoint = (await this.prisma.checkpoint.findFirst({where: { key: 'LAST_SOLANA_SIG' }})).sig;
-		const firstCompletedSig = (await this.prisma.checkpoint.findFirst({where: { key: 'FIRST_SOLANA_SIG' }})).sig;
-		let before = firstCompletedSig;
+		let before = null;
 		let marker = null;
-		let until = firstCompletedSig ? null : lastCompletedPoint;
+		let until = lastCompletedPoint;
 		for(;;) {
 			const tableSet = new Set<string>();
 			const {data: heliusData} = await axios.get<HeliusTransaction[]>(`https://api.helius.xyz/v0/addresses/${AddressLookupTableProgram.programId.toString()}/transactions`, {
@@ -40,13 +40,13 @@ export class AppService implements OnApplicationBootstrap {
 				break;
 			}
 
-			let x = 0;
+			if (marker === null) {
+				marker = heliusData[0].signature;
+			}
 
 			for (let trx of heliusData) {
-				let y = 0;
 				for (let ins of trx.instructions) {
 					if (ins.programId === AddressLookupTableProgram.programId.toString()) {
-						console.log('trx, ins', x++, y++);
 						const address = this.getTableAddress(ins);
 						if (address) {
 							tableSet.add(address);
@@ -60,29 +60,14 @@ export class AppService implements OnApplicationBootstrap {
 			}
 
 			before = heliusData[heliusData.length - 1].signature;
-			await this.prisma.checkpoint.update({
-				where: { key: 'FIRST_SOLANA_SIG' },
-				data: { sig: before },
-			});
-
-			if (marker == null && firstCompletedSig == null) {
-				marker = heliusData[0].signature;
-				await this.prisma.checkpoint.update({
-					where: { key: 'LAST_SOLANA_SIG' },
-					data: { sig: marker },
-				});
-			}
 		}
 
-		// await this.prisma.checkpoint.update({
-		// 	where: { key: 'LAST_SOLANA_SIG' },
-		// 	data: { sig: tempSig },
-		// });
-
-		await this.prisma.checkpoint.update({
-			where: { key: 'FIRST_SOLANA_SIG' },
-			data: { sig: null },
-		});
+		if (marker) {
+			await this.prisma.checkpoint.update({
+				where: { key: 'LAST_SOLANA_SIG' },
+				data: { sig: marker },
+			});
+		}
 	}
 
 	getTableAddress(ins: HeliusInstruction) {
@@ -115,7 +100,6 @@ export class AppService implements OnApplicationBootstrap {
 
 		const lookupInstructions: PartiallyDecodedInstruction[] = trx.transaction.message.instructions.filter(ins => ins.programId.equals(AddressLookupTableProgram.programId));
 
-		const lookupTableAddresses: string[] = [];
 		for (let ins of lookupInstructions) {
 			await this.processRawIns(ins);
 		}
@@ -188,6 +172,16 @@ export class AppService implements OnApplicationBootstrap {
 			}
 		}
 		console.log('checked table', addrKey.toString());
+	}
+
+	async getStats(): Promise<{accounts: number, tables: number, duplicates: number}> {
+		const tablesSet = new Set(this.tableRecords.map(tr => tr.table));
+		const accountsSet = new Set(this.tableRecords.map(tr => tr.account));
+		return {
+			accounts: this.tableRecords.length,
+			tables: tablesSet.size,
+			duplicates: (this.tableRecords.length - accountsSet.size) / this.tableRecords.length
+		}
 	}
 }
 
