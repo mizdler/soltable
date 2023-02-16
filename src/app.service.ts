@@ -60,6 +60,7 @@ export class AppService implements OnApplicationBootstrap {
 			}
 
 			before = heliusData[heliusData.length - 1].signature;
+			await wait(1000);
 		}
 
 		if (marker) {
@@ -183,6 +184,14 @@ export class AppService implements OnApplicationBootstrap {
 			duplicates: (this.tableRecords.length - accountsSet.size) / this.tableRecords.length
 		}
 	}
+}
+
+function wait(time: number) : Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve();
+        }, time);
+    });
 }
 
 type TableRecord = { account: string, table: string }
