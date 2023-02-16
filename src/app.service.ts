@@ -18,7 +18,7 @@ export class AppService implements OnApplicationBootstrap {
 
 	async onApplicationBootstrap() {
 		this.tableRecords = await this.prisma.tableRecord.findMany();
-		await this.processOld();
+		this.processOld();
 	}
 
 	async processOld() {
@@ -69,6 +69,7 @@ export class AppService implements OnApplicationBootstrap {
 				data: { sig: marker },
 			});
 		}
+		console.log('process old finished');
 	}
 
 	getTableAddress(ins: HeliusInstruction) {
